@@ -1,0 +1,154 @@
+<?php
+/**
+ * @file
+ * Provides primary Drupal hook implementations.
+ *
+ * @author Jimmy Berry ("boombatower", http://drupal.org/user/214218)
+ * @author Tobias Bähr ("tobiasb", http://drupal.org/user/183956)
+ */
+
+/**
+ * Denotes "AWS SDK for PHP 2" minimum version number.
+ */
+define('AWSSDK_MINIMUM_VERSION', '2.1.2');
+
+/**
+ * Implements hook_libraries_info().
+ */
+function awssdk_libraries_info() {
+  return array(
+    'awssdk' => array(
+      'title' => 'AWS SDK for PHP 2',
+      'vendor url' => 'http://aws.amazon.com/sdkforphp2/',
+      'download url' => 'http://aws.amazon.com/sdkforphp2/',
+      'version callback' => 'awssdk_get_version',
+      'files' => array(
+        'php' => array(
+          'vendor/autoload.php',
+        ),
+      ),
+      'callbacks' => array(
+        'post-load' => array(
+          'awssdk_set_credentials',
+        ),
+      ),
+    ),
+  );
+}
+
+/**
+ * Load the default AWSSDK settings and apply variable overrides.
+ *
+ * @return array
+ *   An associative array containing AWSSDK setting values.
+ */
+function awssdk_config_load() {
+  if (!($config = &drupal_static(__FUNCTION__))) {
+    $config = ($cache = cache_get(__FUNCTION__)) ? $cache->data : array();
+  }
+
+  if (!$config) {
+    $keys = array(
+      // Required keys.
+      'key',
+      'secret',
+      'account_id',
+      'canonical_id',
+
+      // Optional keys.
+      'canonical_name',
+      'certificate_authority',
+      'default_cache_config',
+      'mfa_serial',
+      'cloudfront_keypair',
+      'cloudfront_pem',
+    );
+
+    // Look for variables for each key and pull in the values.
+    foreach ($keys as $key) {
+      if (($value = variable_get('aws_' . $key)) !== NULL) {
+        $config[$key] = $value;
+      }
+    }
+
+    // Merge required defaults.
+    $config += array(
+      'default_cache_config' => '',
+      'certificate_authority' => FALSE,
+    );
+
+    cache_set(__FUNCTION__, $config);
+  }
+
+  return $config;
+}
+
+/**
+ * Set configuration via Credentials::factory during library load.
+ */
+function awssdk_set_credentials() {
+  if (class_exists('Aws\Common\Credentials\Credentials')) {
+    try{
+      return Aws\Common\Credentials\Credentials::factory(awssdk_config_load());
+    }
+    catch (Exception $e) {
+      watchdog_exception('awssdk', $e);
+    }
+  }
+  else {
+    watchdog('awssdk', 'AWS SDK 2 not found');
+  }
+  return;
+}
+
+function awssdk_get_credentials() {
+  return awssdk_set_credentials();
+}
+
+/**
+ * Returns the AWS SDK for PHP 2 Version.
+ *
+ * @return NULL|Aws\Common\Aws::VERSION
+ *   The version of AWS SDK or NULL.
+ */
+function awssdk_get_version() {
+  $lib = libraries_get_path('awssdk');
+  $autoload_file = $lib . '/vendor/autoload.php';
+  $version = NULL;
+  if (file_exists($autoload_file)) {
+    require_once $autoload_file;
+    $version = Aws\Common\Aws::VERSION;
+  }
+  return $version;
+}
+
+function awssdk_get_client($service, $region) {
+  $service_client = awssdk_get_service_client($region);
+  if (empty($service_client)) {
+    return NULL;
+  }
+  return $service_client->get($service);
+}
+
+function awssdk_get_service_client($region) {
+  $service_client = &drupal_static(__FUNCTION__);
+  if (empty($service_client)) {
+    libraries_load('awssdk');
+    $Credentials = awssdk_get_credentials();
+     if ($Credentials) {
+       $config = array(
+        'region' => constant('Aws\Common\Enum\Region::'.$region),// TODO Admin UI
+        'key' => $Credentials->getAccessKeyId(),
+        'secret' => $Credentials->getSecretKey(),
+        'credentials' => $Credentials,
+      );
+      try {
+        $service_client = Aws\Common\Aws::factory($config);
+      }
+      catch (Exception $e) {
+        watchdog_exception('awssdk', $e);
+      }
+    }
+  }
+  return $service_client;
+}

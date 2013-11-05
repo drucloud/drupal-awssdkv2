@@ -1,0 +1,101 @@
+<?php
+/**
+ * @file
+ * Provides installation functions.
+ *
+ * @author Jimmy Berry ("boombatower", http://drupal.org/user/214218)
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function awssdk_requirements($phase) {
+  $t = get_t();
+  $requirements = array();
+
+  // None of these requirements are relevant outside of runtime.
+  if ($phase != 'runtime') {
+    return $requirements;
+  }
+
+  $info = libraries_load('awssdk');
+  if (!$info['loaded']) {
+    $requirements['awssdk'] = array(
+      'severity' => REQUIREMENT_ERROR,
+      'title' => $t('AWSSDK'),
+      'value' => $t('Failed to load the AWSSDK'),
+      'description' => $t('Please make sure the AWSSDK library is installed in the libraries directory. Use the drush make file for easy installation.'),
+    );
+  }
+  elseif (!$info['version'] || version_compare($info['version'], AWSSDK_MINIMUM_VERSION) < 0) {
+    $requirements['awssdk'] = array(
+      'severity' => REQUIREMENT_ERROR,
+      'title' => $t('AWSSDK'),
+      'value' => $info['version'],
+      'description' => $t('Please make sure the AWSSDK library installed is @version or greater.', array('@version' => AWSSDK_MINIMUM_VERSION)),
+    );
+  }
+  else {
+    global $base_url;
+    $requirements['awssdk'] = array(
+      'severity' => REQUIREMENT_OK,
+      'title' => $t('AWSSDK'),
+      'value' => $info['version'],
+    );
+    $credentials = awssdk_get_credentials();
+    try{
+      // Ensure that the two required credentials have been set.
+      $credentials->getAccessKeyId();
+      $credentials->getSecretKey();
+    }
+    catch (Exception $e) {
+      $requirements['awssdk']['severity'] = REQUIREMENT_ERROR;
+      $requirements['awssdk']['description'] = $t('The required AWSSDK credentials key and secret have not been set.');
+
+      // Add link to configuration form if ui is enabled.
+      if (module_exists('awssdk_ui')) {
+        $requirements['awssdk']['description'] .= ' [' . l($t('configuration'), 'admin/config/media/awssdk') . ']';
+      }
+    }
+  }
+
+  return $requirements;
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function awssdk_uninstall() {
+  // Remove all variables.
+  $results = db_select('variable', 'v')
+    ->fields('v', array('name'))
+    ->condition('name', 'aws%', 'LIKE')
+    ->execute();
+  foreach ($results as $result) {
+    variable_del($result->name);
+  }
+}
+
+/**
+ * Remove aws_enable_extensions variable since the settings was removed in 1.5.
+ */
+function awssdk_update_7500() {
+  variable_del('aws_enable_extensions');
+}
+
+/**
+ * Update configuration variables from 1.4.x to 1.5.x.
+ */
+function awssdk_update_7501() {
+  $map = array(
+    'aws_secret_key' => 'aws_secret',
+    'aws_cloudfront_keypair_id' => 'aws_cloudfront_keypair',
+    'aws_cloudfront_private_key_pem' => 'aws_cloudfront_pem',
+  );
+  foreach ($map as $old => $new) {
+    if ($value = variable_get($old)) {
+      variable_set($new, $value);
+    }
+    variable_del($old);
+  }
+}
