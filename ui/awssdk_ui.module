@@ -59,6 +59,12 @@ function awssdk_ui_settings_form($form, &$form_state) {
     '#required' => TRUE,
     '#description' => t('Amazon Web Services Secret Key. Found in the AWS Security Credentials.'),
   );
+  $form['required']['aws_region'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Amazon Web Services region'),
+    '#default_value' => variable_get('aws_region', ''),
+    '#description' => t('Amazon Web Services server region. If not provided, it should be input in api with awssdk_get_client'),
+  );
   $form['required']['aws_certificate_authority'] = array(
     '#type' => 'checkbox',
     '#title' => t('Determines which Cerificate Authority file to use'),

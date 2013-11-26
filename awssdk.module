@@ -131,13 +131,15 @@ function awssdk_get_client($service, $region) {
 }
 
 function awssdk_get_service_client($region) {
+
+  $aws_region = variable_get('aws_region', $region);
   $service_client = &drupal_static(__FUNCTION__);
   if (empty($service_client)) {
     libraries_load('awssdk');
     $Credentials = awssdk_get_credentials();
      if ($Credentials) {
        $config = array(
-        'region' => constant('Aws\Common\Enum\Region::'.$region),// TODO Admin UI
+        'region' => constant('Aws\Common\Enum\Region::'.$aws_region),
         'key' => $Credentials->getAccessKeyId(),
         'secret' => $Credentials->getSecretKey(),
         'credentials' => $Credentials,
