@@ -15,8 +15,10 @@ Configuration can be performed either using variables hardcoded into
 settings.php or the UI. If you want to hardcode them then look at the UI for the
 variable names. The basics are as follows.
 
+`
 $conf['aws_key'] = '...';
 $conf['aws_secret'] = '...';
 $conf['aws_account_id'] = '...';
 $conf['aws_canonical_id'] = '...';
-
+$conf['aws_region'] = '...'; //Regin example: TOKYO , SINGAPORE
+`
