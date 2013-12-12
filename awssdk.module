@@ -122,7 +122,7 @@ function awssdk_get_version() {
   return $version;
 }
 
-function awssdk_get_client($service, $region) {
+function awssdk_get_client($service, $region = NULL) {
   $service_client = awssdk_get_service_client($region);
   if (empty($service_client)) {
     return NULL;
